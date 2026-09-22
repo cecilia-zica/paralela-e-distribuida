@@ -1,0 +1,5 @@
+/life
+/life_par
+*.o
+build/*
+!build/.gitkeep
