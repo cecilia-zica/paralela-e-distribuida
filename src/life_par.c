@@ -51,7 +51,7 @@ void parse_rule(const char *text, Rule *rule) {
  * posições fora da matriz são simplesmente ignoradas.
  */
 int count_neighbors(
-    const char *grid,
+    const unsigned char *grid,  // a grade agora guarda 0 e 1
     int rows,
     int cols,
     int row,
@@ -72,9 +72,7 @@ int count_neighbors(
             if (nr >= 0 && nr < rows &&
                 nc >= 0 && nc < cols) {
 
-                if (grid[nr * cols + nc] == 'x') {
-                    count++;
-                }
+                count += grid[nr * cols + nc]; //soma direto, sem desvio
             }
         }
     }
@@ -92,44 +90,44 @@ int count_neighbors(
  * Isso garante a evolução síncrona.
  */
 void next_generation(
-    const char *current,
-    char *next,
+    const unsigned char *current,
+    unsigned char *next,
     const int *rule_matrix,
     const Rule *rules,
     int rows,
     int cols
 ) {
     for (int row = 0; row < rows; row++) {
+
+        /* ponteiros para a linha de cima, a minha, e a de baixo */
+        const unsigned char *up = current + (row - 1) * cols;
+        const unsigned char *me = current +  row      * cols;
+        const unsigned char *dn = current + (row + 1) * cols;
+
+        int tem_cima  = (row > 0);
+        int tem_baixo = (row < rows - 1);
+
         for (int col = 0; col < cols; col++) {
 
             int pos = row * cols + col;
+            int neighbors;
 
-            int neighbors =
-                count_neighbors(current, rows, cols, row, col);
-
-            int rule_id = rule_matrix[pos];
-
-            if (current[pos] == 'x') {
-                /*
-                 * Célula atualmente viva.
-                 * Consulta a parte S da regra.
-                 */
-                if (rules[rule_id].survival[neighbors]) {
-                    next[pos] = 'x';
-                } else {
-                    next[pos] = ' ';
-                }
-
+            if (tem_cima && tem_baixo && col > 0 && col < cols - 1) {
+                /* MIOLO: os 8 vizinhos existem, soma direta sem checar nada */
+                neighbors = up[col-1] + up[col] + up[col+1]
+                          + me[col-1]           + me[col+1]
+                          + dn[col-1] + dn[col] + dn[col+1];
             } else {
-                /*
-                 * Célula atualmente morta.
-                 * Consulta a parte B da regra.
-                 */
-                if (rules[rule_id].birth[neighbors]) {
-                    next[pos] = 'x';
-                } else {
-                    next[pos] = ' ';
-                }
+                /* BORDA: caminho lento, com checagem de limites */
+                neighbors = count_neighbors(current, rows, cols, row, col);
+            }
+
+            const Rule *regra = &rules[rule_matrix[pos]];
+
+            if (me[col]) {
+                next[pos] = regra->survival[neighbors];
+            } else {
+                next[pos] = regra->birth[neighbors];
             }
         }
     }
@@ -227,8 +225,8 @@ int main(void) {
     while ((ch = getchar()) != '\n' && ch != EOF) {
     }
 
-    char *current = malloc(total_cells * sizeof(char));
-    char *next = malloc(total_cells * sizeof(char));
+    unsigned char *current = malloc(total_cells * sizeof(unsigned char));
+    unsigned char *next = malloc(total_cells * sizeof(unsigned char));
 
     if (current == NULL || next == NULL) {
         fprintf(stderr, "Erro de alocacao de memoria.\n");
@@ -281,11 +279,8 @@ int main(void) {
          */
         for (int col = 0; col < C; col++) {
 
-            if (line[col] == 'x' || line[col] == 'X') {
-                current[row * C + col] = 'x';
-            } else {
-                current[row * C + col] = ' ';
-            }
+            current[row * C + col] =
+            (line[col] == 'x' || line[col] == 'X') ? 1 : 0;
         }
     }
 
@@ -310,7 +305,7 @@ int main(void) {
             C
         );
 
-        char *temp = current;
+        unsigned char *temp = current;
         current = next;
         next = temp;
     }
@@ -322,7 +317,7 @@ int main(void) {
     for (int row = 0; row < L; row++) {
 
         for (int col = 0; col < C; col++) {
-            putchar(current[row * C + col]);
+            putchar(current[row * C + col] ? 'x' : ' ');
         }
 
         putchar('\n');
