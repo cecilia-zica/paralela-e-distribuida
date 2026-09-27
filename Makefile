@@ -11,3 +11,8 @@ life_par: src/life_par.c
 
 clean:
 	rm -f life life_par
+
+.PHONY: all clean test
+
+test: life_par
+	python3 tests/test_life.py ./life_par

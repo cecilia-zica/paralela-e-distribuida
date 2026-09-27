@@ -17,6 +17,16 @@ Gera dois executaveis:
 
 ## Execucao
 
+    ./life_par < life-1.in
+
+## Testes
+
+    make test
+
+Requer Python 3. Compara os quatro resultados fornecidos byte a byte e executa
+24 casos sinteticos com resultados calculados por uma referencia em Python.
+
+
 ## Estrutura do projeto
 
     .

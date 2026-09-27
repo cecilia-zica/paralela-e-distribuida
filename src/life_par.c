@@ -82,22 +82,26 @@ int count_neighbors(
 
 
 /*
- * Calcula uma geração completa.
+ * Calcula as linhas do intervalo [inicio, fim).
+ * Requer 0 <= inicio <= fim <= rows. rows/cols são as dimensões globais.
+ * Vizinhos fora da faixa ainda são lidos de current, se pertencem à grade.
  *
  * current nunca é alterada durante o cálculo.
  * Todos os novos estados são escritos em next.
  *
  * Isso garante a evolução síncrona.
  */
-void next_generation(
+void update_rows(
     const unsigned char *current,
     unsigned char *next,
     const int *rule_matrix,
     const Rule *rules,
     int rows,
-    int cols
+    int cols,
+    int inicio,
+    int fim
 ) {
-    for (int row = 0; row < rows; row++) {
+    for (int row = inicio; row < fim; row++) {
 
         /* ponteiros para a linha de cima, a minha, e a de baixo */
         const unsigned char *up = current + (row - 1) * cols;
@@ -131,6 +135,19 @@ void next_generation(
             }
         }
     }
+}
+
+
+/* Referência sequencial: calcula todas as linhas antes de trocar os buffers. */
+void next_generation(
+    const unsigned char *current,
+    unsigned char *next,
+    const int *rule_matrix,
+    const Rule *rules,
+    int rows,
+    int cols
+) {
+    update_rows(current, next, rule_matrix, rules, rows, cols, 0, rows);
 }
 
 
