@@ -103,13 +103,14 @@ void update_rows(
 ) {
     for (int row = inicio; row < fim; row++) {
 
-        /* ponteiros para a linha de cima, a minha, e a de baixo */
-        const unsigned char *up = current + (row - 1) * cols;
-        const unsigned char *me = current +  row      * cols;
-        const unsigned char *dn = current + (row + 1) * cols;
-
         int tem_cima  = (row > 0);
         int tem_baixo = (row < rows - 1);
+
+        /* up/dn so saem da propria linha quando a vizinha existe, para nao
+           formar ponteiro fora do bloco alocado */
+        const unsigned char *me = current + row * cols;
+        const unsigned char *up = tem_cima  ? me - cols : me;
+        const unsigned char *dn = tem_baixo ? me + cols : me;
 
         for (int col = 0; col < cols; col++) {
 
