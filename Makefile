@@ -16,3 +16,4 @@ clean:
 
 test: life_par
 	python3 tests/test_life.py ./life_par
+	python3 tests/test_validation.py ./life_par
