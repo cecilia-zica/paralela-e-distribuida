@@ -1,46 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
-#include <errno.h>
-#include <limits.h>
-#include <stdint.h>
 
 #define MAX_RULE_LEN 32
-
-/* le um inteiro sem permitir overflow na conversao ou tokens incompletos */
-static int read_int(int *value) {
-    char token[64];
-    size_t length = 0;
-    int ch;
-    do {
-        ch = getchar();
-    } while (ch != EOF && isspace((unsigned char)ch));
-
-    if (ch == EOF) return 0;
-    do {
-        if (length == sizeof(token) - 1) return 0;
-        token[length++] = (char)ch;
-        ch = getchar();
-    } while (ch != EOF && !isspace((unsigned char)ch));
-    /* Preserva o separador para a leitura da grade apos a matriz de regras */
-    if (ch != EOF) ungetc(ch, stdin);
-    token[length] = '\0';
-
-    char *end;
-    errno = 0;
-    long parsed = strtol(token, &end, 10);
-    if (errno == ERANGE || end == token || *end != '\0' ||
-        parsed < INT_MIN || parsed > INT_MAX) return 0;
-    *value = (int)parsed;
-    return 1;
-}
-
-static int checked_product(size_t a, size_t b, size_t *result) {
-    if (b != 0 && a > SIZE_MAX / b) return 0;
-    *result = a * b;
-    return 1;
-}
 
 typedef struct {
     int birth[9];
@@ -110,7 +72,7 @@ int count_neighbors(
             if (nr >= 0 && nr < rows &&
                 nc >= 0 && nc < cols) {
 
-                count += grid[(size_t)nr * (size_t)cols + (size_t)nc]; //soma direto, sem desvio
+                count += grid[nr * cols + nc]; //soma direto, sem desvio
             }
         }
     }
@@ -146,13 +108,13 @@ void update_rows(
 
         /* up/dn so saem da propria linha quando a vizinha existe, para nao
            formar ponteiro fora do bloco alocado */
-        const unsigned char *me = current + (size_t)row * (size_t)cols;
+        const unsigned char *me = current + row * cols;
         const unsigned char *up = tem_cima  ? me - cols : me;
         const unsigned char *dn = tem_baixo ? me + cols : me;
 
         for (int col = 0; col < cols; col++) {
 
-            size_t pos = (size_t)row * (size_t)cols + (size_t)col;
+            int pos = row * cols + col;
             int neighbors;
 
             if (tem_cima && tem_baixo && col > 0 && col < cols - 1) {
@@ -194,33 +156,19 @@ int main(void) {
 
     int L, C, G;
 
-    if (!read_int(&L) || !read_int(&C) || !read_int(&G)) {
+    if (scanf("%d %d %d", &L, &C, &G) != 3) {
         fprintf(stderr, "Erro ao ler L, C e G.\n");
         return 1;
     }
 
     int R;
 
-    if (!read_int(&R)) {
+    if (scanf("%d", &R) != 1) {
         fprintf(stderr, "Erro ao ler o numero de regras.\n");
         return 1;
     }
 
-    if (L <= 0 || C <= 0 || C > INT_MAX - 3 || G < 0 || R <= 0) {
-        fprintf(stderr, "Dimensões, gerações ou número de regras inválidos.\n");
-        return 1;
-    }
-
-    size_t total_cells, matrix_bytes, rules_bytes, grid_bytes;
-    if (!checked_product((size_t)L, (size_t)C, &total_cells) ||
-        !checked_product(total_cells, sizeof(int), &matrix_bytes) ||
-        !checked_product(total_cells, sizeof(unsigned char), &grid_bytes) ||
-        !checked_product((size_t)R, sizeof(Rule), &rules_bytes)) {
-        fprintf(stderr, "Tamanho da entrada excede o limite de memoria representavel.\n");
-        return 1;
-    }
-
-    Rule *rules = malloc(rules_bytes);
+    Rule *rules = malloc(R * sizeof(Rule));
 
     if (rules == NULL) {
         fprintf(stderr, "Erro de alocacao de memoria.\n");
@@ -246,7 +194,9 @@ int main(void) {
         parse_rule(rule_text, &rules[i]);
     }
 
-    int *rule_matrix = malloc(matrix_bytes);
+    int total_cells = L * C;
+
+    int *rule_matrix = malloc(total_cells * sizeof(int));
 
     if (rule_matrix == NULL) {
         fprintf(stderr, "Erro de alocacao de memoria.\n");
@@ -261,9 +211,9 @@ int main(void) {
     for (int row = 0; row < L; row++) {
         for (int col = 0; col < C; col++) {
 
-            size_t pos = (size_t)row * (size_t)C + (size_t)col;
+            int pos = row * C + col;
 
-            if (!read_int(&rule_matrix[pos])) {
+            if (scanf("%d", &rule_matrix[pos]) != 1) {
                 fprintf(stderr, "Erro ao ler matriz de regras.\n");
                 free(rule_matrix);
                 free(rules);
@@ -293,8 +243,8 @@ int main(void) {
     while ((ch = getchar()) != '\n' && ch != EOF) {
     }
 
-    unsigned char *current = malloc(grid_bytes);
-    unsigned char *next = malloc(grid_bytes);
+    unsigned char *current = malloc(total_cells * sizeof(unsigned char));
+    unsigned char *next = malloc(total_cells * sizeof(unsigned char));
 
     if (current == NULL || next == NULL) {
         fprintf(stderr, "Erro de alocacao de memoria.\n");
@@ -312,7 +262,7 @@ int main(void) {
      *
      * É necessário usar fgets.
      */
-    char *line = malloc((size_t)C + 3);
+    char *line = malloc((C + 3) * sizeof(char));
 
     if (line == NULL) {
         fprintf(stderr, "Erro de alocacao de memoria.\n");
@@ -339,26 +289,15 @@ int main(void) {
             return 1;
         }
 
-        /* espacos sao celulas logo nao devem ser removidos. Aceita LF, CRLF
-           e EOF apos a ultima linha completa */
-        size_t length = strcspn(line, "\r\n");
-        int valid_end = line[length] == '\n' ||
-            (line[length] == '\r' && line[length + 1] == '\n') ||
-            (line[length] == '\0' && feof(stdin) && row == L - 1);
-        if (length != (size_t)C || !valid_end) {
-            fprintf(stderr, "Linha %d da grade deve conter exatamente %d posicoes.\n",
-                    row + 1, C);
-            free(line);
-            free(current);
-            free(next);
-            free(rule_matrix);
-            free(rules);
-            return 1;
-        }
-
+        /*
+         * Copia exatamente C posições.
+         *
+         * Caso haja alguma linha menor por algum motivo,
+         * as posições faltantes são consideradas mortas.
+         */
         for (int col = 0; col < C; col++) {
 
-            current[(size_t)row * (size_t)C + (size_t)col] =
+            current[row * C + col] =
             (line[col] == 'x' || line[col] == 'X') ? 1 : 0;
         }
     }
@@ -396,7 +335,7 @@ int main(void) {
     for (int row = 0; row < L; row++) {
 
         for (int col = 0; col < C; col++) {
-            putchar(current[(size_t)row * (size_t)C + (size_t)col] ? 'x' : ' ');
+            putchar(current[row * C + col] ? 'x' : ' ');
         }
 
         putchar('\n');

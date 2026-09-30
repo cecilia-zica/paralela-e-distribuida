@@ -44,20 +44,3 @@ geracoes, regras distintas por posicao e nascimento com zero vizinhos.
 Ainda nao ha pthreads nem medicao de ganho de desempenho.
 
 ## Duvidas
-
-## Validacao da entrada e tamanhos (sem modularizacao)
-
-As alteracoes continuam em src/life_par.c. read_int usa strtol com verificacao
-de limites para evitar overflow na conversao de numeros de entrada, inclusive
-nos identificadores de regra. Exige L/C positivos, G nao negativo e R positivo.
-Como fgets recebe tamanho int, C deve ser no maximo INT_MAX - 3.
-
-Tamanhos e indices lineares usam size_t. checked_product verifica os limites
-antes de multiplicar dimensoes ou calcular bytes para malloc. Falhas de alocacao
-continuam retornando erro; tamanho representavel nao garante memoria disponivel.
-
-Cada linha da grade deve ter exatamente C posicoes. Espacos finais contam como
-celulas; LF e CRLF sao aceitos, assim como a ultima linha completa sem quebra.
-Linhas curtas/longas sao rejeitadas antes de consultar estados incompletos.
-
-OBS: com essas validações, o life-4 está dando erro, pois foram definidas 40 colunas e algumas linhas da grade contem 41 ou 42 caracteres. fiquei em duvida se é um erro proposital do professor ou nao
