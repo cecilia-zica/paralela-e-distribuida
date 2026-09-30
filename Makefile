@@ -6,8 +6,8 @@ all: life life_par
 life: life.c
 	$(CC) $(FLAGS) life.c -o life
 
-life_par: src/life_par.c
-	$(CC) $(FLAGS) src/life_par.c -o life_par
+life_par: src/life_par.c src/io.c src/io.h src/game_rules.h
+	$(CC) $(FLAGS) src/life_par.c src/io.c -o life_par
 
 clean:
 	rm -f life life_par
