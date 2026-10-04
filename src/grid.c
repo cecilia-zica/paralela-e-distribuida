@@ -1,5 +1,4 @@
 #include "game_rules.h"
-#include "grid.h"
 
 /*
  * Converte uma regra no formato B3/S23, B36/S23, etc.
@@ -54,7 +53,7 @@ void parse_rule(
  * A grade não é toroidal:
  * posições fora da matriz são simplesmente ignoradas.
  */
-static int count_neighbors(
+int count_neighbors(
     const unsigned char *grid, // a grade agora guarda 0 e 1
     int rows,
     int cols,

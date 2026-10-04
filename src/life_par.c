@@ -1,8 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "grid.h"
 #include "io.h"
-#include "simulation.h"
 
 int main(void)
 {

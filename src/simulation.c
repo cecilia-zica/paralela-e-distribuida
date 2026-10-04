@@ -1,5 +1,5 @@
 #include <stdlib.h>
-#include "simulation.h"
+#include "game_rules.h"
 
 void free_config(SimulationConfig *config)
 {
