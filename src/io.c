@@ -4,14 +4,6 @@
 #include <stdlib.h>
 #include "io.h"
 
-void free_config(SimulationConfig *config)
-{
-  free(config->initial_grid);
-  free(config->rule_matrix);
-  free(config->rules);
-  *config = (SimulationConfig){0};
-}
-
 int read_input(SimulationConfig *config)
 {
   char *line = NULL;
