@@ -43,4 +43,12 @@ geracoes, regras distintas por posicao e nascimento com zero vizinhos.
 
 Ainda nao ha pthreads nem medicao de ganho de desempenho.
 
+## Separacao em modulos
+
+O codigo foi dividido por responsabilidade: `game_rules` interpreta as regras,
+`grid` calcula a evolucao, `simulation` define a configuracao e libera seus recursos,
+e `io` cuida da leitura e impressao. `life_par.c` ficou com o `main`, o loop das
+geracoes e a troca dos buffers. `count_neighbors` ficou interna a `grid.c`;
+`update_rows` continua publica para as futuras threads.
+
 ## Duvidas
