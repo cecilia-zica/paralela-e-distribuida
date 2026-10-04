@@ -3,3 +3,4 @@
 *.o
 build/*
 !build/.gitkeep
+/parallel_static
