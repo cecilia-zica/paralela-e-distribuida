@@ -5,7 +5,7 @@
 
 // - - - Data Structures
 typedef struct {
-    const unsigned char *current;
+    unsigned char *current;   // sem const: as threads alternam os dois buffers
     unsigned char *next;
     const int *rule_matrix;
     const Rule *rules;
@@ -13,16 +13,33 @@ typedef struct {
     int cols;
     int inicio;
     int fim;
+    int generations;
+    pthread_barrier_t *barreira;
 } Thread;
 
 // - - - Functions Declarations
 void *thread_work(void *arg) {
     Thread *thread_data = (Thread *)arg;
-    update_rows(thread_data->current, thread_data->next, thread_data->rule_matrix,
-                thread_data->rules, thread_data->rows, thread_data->cols,
-                thread_data->inicio, thread_data->fim);
+
+    // copias locais: cada thread alterna os seus proprios ponteiros
+    unsigned char *current = thread_data->current;
+    unsigned char *next = thread_data->next;
+
+    for (int generation = 0; generation < thread_data->generations; generation++) {
+        update_rows(current, next, thread_data->rule_matrix,
+                    thread_data->rules, thread_data->rows, thread_data->cols,
+                    thread_data->inicio, thread_data->fim);
+
+        // evolucao sincrona: ninguem comeca t+1 antes de todas terminarem t
+        pthread_barrier_wait(thread_data->barreira);
+
+        unsigned char *temp = current;
+        current = next;
+        next = temp;
+    }
+
     return NULL; 
-}; 
+};
 
 int main(int argc, char *argv[]) {
 
@@ -60,6 +77,14 @@ int main(int argc, char *argv[]) {
   Thread threads[n_threads];
   pthread_t thread_ids[n_threads];
 
+  pthread_barrier_t barreira;
+  if (pthread_barrier_init(&barreira, NULL, n_threads) != 0) {
+    fprintf(stderr, "Erro ao inicializar a barreira.\n");
+    free(buffer);
+    free_config(&config);
+    return 1;
+  }
+
   // Divide the rows among the threads (atributes that doesn't change during the generations)
   int rows_per_thread = config.L / n_threads;
   int remaining_rows = config.L % n_threads;
@@ -70,7 +95,10 @@ int main(int argc, char *argv[]) {
       if (i >= n_threads - remaining_rows) {
           current_line = rows_per_thread + 1;
       }
-
+      threads[i].current = current;
+      threads[i].next = next;
+      threads[i].generations = config.G;
+      threads[i].barreira = &barreira;
       threads[i].rule_matrix = config.rule_matrix;
       threads[i].rules = config.rules;
       threads[i].rows = config.L;
@@ -80,24 +108,17 @@ int main(int argc, char *argv[]) {
       cursor = threads[i].fim;
   }
 
-  for (int generation = 0; generation < config.G; generation++) {
+    // threads criadas uma vez, fora do laco de geracoes
+  for (int i = 0; i < n_threads; i++)
+      pthread_create(&thread_ids[i], NULL, thread_work, &threads[i]);
 
-    for (int i = 0; i < n_threads; i++) {
-        threads[i].current = current;   // current/next changes each generation 
-        threads[i].next = next;
-        pthread_create(&thread_ids[i], NULL, thread_work, &threads[i]);
-    }
+  for (int i = 0; i < n_threads; i++)
+      pthread_join(thread_ids[i], NULL);
 
-    for (int i = 0; i < n_threads; i++) {
-        pthread_join(thread_ids[i], NULL);
-    }
+  // cada thread alternou os buffers G vezes: G par termina em current, impar em next
+  print_grid((config.G % 2 == 0) ? current : next, config.L, config.C);
 
-    unsigned char *temp = current;
-    current = next;
-    next = temp;
-  }
-
-  print_grid(current, config.L, config.C);
+  pthread_barrier_destroy(&barreira);
 
   free(buffer);
   free_config(&config);

@@ -21,10 +21,9 @@ duas mudancas:
 as outras edicoes (declaracao das grades e o temp da troca de ponteiros) foram so
 consequencia da mudanca de tipo pra unsigned char.
 
-obs: quando row == 0 o ponteiro up aponta pra fora do vetor, mas nesse caso o
-tem_cima e falso e o ramo do miolo nunca roda, entao ninguem le aquilo.
-
-obs: ainda nao tem nenhuma linha de paralelismo, continua 100% sequencial.
+obs: up e dn so apontam pra outra linha quando ela existe (ternario com
+tem_cima/tem_baixo). formar ponteiro antes do inicio do bloco alocado e
+comportamento indefinido em C mesmo sem ler.
 
 ## Preparacao para threads
 
@@ -41,8 +40,6 @@ os quatro arquivos fornecidos byte a byte e mais 24 casos com um oraculo simples
 em Python: 1x1, linha unica, coluna unica, grades pequenas, zero e multiplas
 geracoes, regras distintas por posicao e nascimento com zero vizinhos.
 
-Ainda nao ha pthreads nem medicao de ganho de desempenho.
-
 ## Separacao em modulos
 
 O codigo foi dividido por responsabilidade: `game_rules` interpreta as regras,
@@ -50,5 +47,17 @@ O codigo foi dividido por responsabilidade: `game_rules` interpreta as regras,
 e `io` cuida da leitura e impressao. `life_par.c` ficou com o `main`, o loop das
 geracoes e a troca dos buffers. `count_neighbors` ficou interna a `grid.c`;
 `update_rows` continua publica para as futuras threads.
+
+## Threads criadas uma vez + barreira
+
+a primeira versao criava e destruia as threads a cada geracao. com G grande isso
+nao paga: em 200x200 com G=3000 a paralela ficava mais lenta que a sequencial.
+agora as threads sao criadas uma vez e cada uma roda as G
+geracoes, com pthread_barrier_wait no fim de cada uma garantindo a evolucao
+sincrona.
+
+uma barreira basta porque cada thread troca os proprios ponteiros depois dela —
+nao tem ponteiro compartilhado sendo alternado. como as threads alternam G vezes,
+o main refaz a conta: G par termina em current, G impar em next.
 
 ## Duvidas
