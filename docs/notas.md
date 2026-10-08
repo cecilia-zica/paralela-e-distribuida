@@ -60,4 +60,24 @@ uma barreira basta porque cada thread troca os proprios ponteiros depois dela â€
 nao tem ponteiro compartilhado sendo alternado. como as threads alternam G vezes,
 o main refaz a conta: G par termina em current, G impar em next.
 
+## Teste no SDumont
+
+rodei a versao atual no Santos Dumont, fila sequana_cpu_dev, 1 no com 48 nucleos,
+gcc 13.2 com -O3. instancia 2000x2000 com G=100
+
+| threads  | tempo  | speedup vs life.c | eficiencia |
+| -------- | ------ | ----------------- | ---------- |
+| life.c   | 4,251s | 1,00              | -          |
+| life_par | 1,951s | 2,18              | -          |
+| 1        | 1,871s | 2,27              | 100%       |
+| 2        | 1,096s | 3,88              | 85%        |
+| 4        | 0,731s | 5,82              | 64%        |
+| 8        | 0,523s | 8,13              | 45%        |
+| 16       | 0,413s | 10,29             | 28%        |
+| 24       | 0,384s | 11,07             | 20%        |
+| 48       | 0,367s | 11,58             | 11%        |
+
+melhor resultado: 11,58x com 48 threads. mas de 24 pra 48 so ganhamos 4% e a
+eficiencia cai pra 11%, entao tem algo segurando (provavelmente a leitura, impresaao ou algo sequencial)
+
 ## Duvidas
