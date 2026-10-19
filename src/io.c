@@ -2,10 +2,21 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include "io.h"
 
-int read_input(SimulationConfig *config)
+static double elapsed_seconds(const struct timespec *start,
+                              const struct timespec *end)
 {
+  return (double)(end->tv_sec - start->tv_sec) +
+         (double)(end->tv_nsec - start->tv_nsec) / 1000000000.0;
+}
+
+int read_input_profiled(SimulationConfig *config, InputTiming *timing)
+{
+  struct timespec total_start, total_end, allocation_start, allocation_end;
+  double allocation_seconds = 0.0;
+  clock_gettime(CLOCK_MONOTONIC, &total_start);
   char *line = NULL;
   *config = (SimulationConfig){0};
 
@@ -36,10 +47,13 @@ int read_input(SimulationConfig *config)
     goto fail;
   }
 
+  clock_gettime(CLOCK_MONOTONIC, &allocation_start);
   config->rules = malloc((size_t)config->R * sizeof(*config->rules));
   config->rule_matrix = malloc(total_cells * sizeof(*config->rule_matrix));
   config->initial_grid = malloc(total_cells * sizeof(*config->initial_grid));
   line = calloc((size_t)config->C + 3, 1);
+  clock_gettime(CLOCK_MONOTONIC, &allocation_end);
+  allocation_seconds += elapsed_seconds(&allocation_start, &allocation_end);
   if (!config->rules || !config->rule_matrix || !config->initial_grid || !line)
   {
     fprintf(stderr, "Erro de alocacao de memoria.\n");
@@ -90,12 +104,31 @@ int read_input(SimulationConfig *config)
   }
 
   free(line);
+  clock_gettime(CLOCK_MONOTONIC, &total_end);
+  if (timing != NULL)
+  {
+    double total_seconds = elapsed_seconds(&total_start, &total_end);
+    timing->allocation_seconds = allocation_seconds;
+    timing->input_seconds = total_seconds - allocation_seconds;
+  }
   return 0;
 
 fail:
   free(line);
   free_config(config);
+  clock_gettime(CLOCK_MONOTONIC, &total_end);
+  if (timing != NULL)
+  {
+    double total_seconds = elapsed_seconds(&total_start, &total_end);
+    timing->allocation_seconds = allocation_seconds;
+    timing->input_seconds = total_seconds - allocation_seconds;
+  }
   return 1;
+}
+
+int read_input(SimulationConfig *config)
+{
+  return read_input_profiled(config, NULL);
 }
 
 void print_grid(const unsigned char *grid, int rows, int cols)

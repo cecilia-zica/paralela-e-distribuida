@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include <time.h>
 #include "io.h"
 
 // - - - Data Structures
@@ -16,6 +17,12 @@ typedef struct {
     int generations;
     pthread_barrier_t *barreira;
 } Thread;
+
+static double elapsed_seconds(const struct timespec *start,
+                              const struct timespec *end) {
+    return (double)(end->tv_sec - start->tv_sec) +
+           (double)(end->tv_nsec - start->tv_nsec) / 1000000000.0;
+}
 
 // - - - Functions Declarations
 void *thread_work(void *arg) {
@@ -42,6 +49,11 @@ void *thread_work(void *arg) {
 };
 
 int main(int argc, char *argv[]) {
+  struct timespec total_start, allocation_start, allocation_end;
+  struct timespec evolution_start, evolution_end, print_start, print_end, total_end;
+  InputTiming input_timing = {0};
+  int profiling = (getenv("LIFE_TIMING") != NULL);
+  clock_gettime(CLOCK_MONOTONIC, &total_start);
 
   if (argc < 2) {
     fprintf(stderr, "Uso: %s <numero_de_threads> < entrada.in\n", argv[0]);
@@ -55,7 +67,7 @@ int main(int argc, char *argv[]) {
   }
 
   SimulationConfig config = {0};
-  if (read_input(&config) != 0)
+  if (read_input_profiled(&config, profiling ? &input_timing : NULL) != 0)
     return 1;
 
     
@@ -63,7 +75,11 @@ int main(int argc, char *argv[]) {
   size_t total_cells = (size_t)config.L * config.C;
 
   // sizeof(*buffer) adapts automatically if buffer's type ever changes
+  clock_gettime(CLOCK_MONOTONIC, &allocation_start);
   unsigned char *buffer = malloc(total_cells * sizeof(*buffer));
+  clock_gettime(CLOCK_MONOTONIC, &allocation_end);
+  double allocation_seconds = input_timing.allocation_seconds +
+                              elapsed_seconds(&allocation_start, &allocation_end);
   if (buffer == NULL) {
     fprintf(stderr, "Erro de alocacao de memoria.\n");
     free_config(&config); // release what read_input already allocated
@@ -109,14 +125,31 @@ int main(int argc, char *argv[]) {
   }
 
     // threads criadas uma vez, fora do laco de geracoes
+  clock_gettime(CLOCK_MONOTONIC, &evolution_start);
   for (int i = 0; i < n_threads; i++)
       pthread_create(&thread_ids[i], NULL, thread_work, &threads[i]);
 
   for (int i = 0; i < n_threads; i++)
       pthread_join(thread_ids[i], NULL);
+  clock_gettime(CLOCK_MONOTONIC, &evolution_end);
 
   // cada thread alternou os buffers G vezes: G par termina em current, impar em next
+  clock_gettime(CLOCK_MONOTONIC, &print_start);
   print_grid((config.G % 2 == 0) ? current : next, config.L, config.C);
+  clock_gettime(CLOCK_MONOTONIC, &print_end);
+  clock_gettime(CLOCK_MONOTONIC, &total_end);
+
+  if (profiling) {
+    fprintf(stderr,
+            "TIMING rows=%d cols=%d generations=%d threads=%d "
+            "input_s=%.9f allocation_s=%.9f evolution_s=%.9f "
+            "print_s=%.9f total_s=%.9f\n",
+            config.L, config.C, config.G, n_threads,
+            input_timing.input_seconds, allocation_seconds,
+            elapsed_seconds(&evolution_start, &evolution_end),
+            elapsed_seconds(&print_start, &print_end),
+            elapsed_seconds(&total_start, &total_end));
+  }
 
   pthread_barrier_destroy(&barreira);
 
