@@ -11,8 +11,15 @@ set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
 
 # Use a mesma versão registrada nas medições anteriores do projeto.
-module load gcc/13.2.0
+module load gcc/13.2_sequana
 export LIFE_TIMING=1
+parallel_bin="${PARALLEL_BIN:-./parallel_static}"
+raw="${TIMINGS_LOG:-bench-results/timings.log}"
+if [[ ! -x "$parallel_bin" ]]; then
+  echo "Executavel ausente ou sem permissao: $parallel_bin" >&2
+  exit 1
+fi
+mkdir -p "$(dirname "$raw")"
 
 mkdir -p bench-inputs bench-results
 printf 'host=%s\ngcc=%s\ncpus=%s\n' \
@@ -28,16 +35,15 @@ python3 scripts/generate_bench_input.py 1000 1000 100 bench-inputs/1000x1000_G10
 python3 scripts/generate_bench_input.py 2000 2000 10 bench-inputs/2000x2000_G10.in
 python3 scripts/generate_bench_input.py 2000 2000 100 bench-inputs/2000x2000_G100.in
 
-raw=bench-results/timings.log
 : > "$raw"
 
 for input in bench-inputs/*.in; do
   # Aquecimento e leitura inicial do arquivo, não contabilizados.
-  ./parallel_static 1 < "$input" > /dev/null 2>/dev/null
+  "$parallel_bin" 1 < "$input" > /dev/null 2>/dev/null
 
   for threads in 1 2 4 8 16 24 48; do
     for run in 1 2 3 4 5; do
-      ./parallel_static "$threads" < "$input" > /dev/null 2>> "$raw"
+      "$parallel_bin" "$threads" < "$input" > /dev/null 2>> "$raw"
     done
   done
 done

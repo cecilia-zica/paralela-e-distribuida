@@ -1,5 +1,6 @@
 #include <limits.h>
 #include <stdint.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -12,12 +13,73 @@ static double elapsed_seconds(const struct timespec *start,
          (double)(end->tv_nsec - start->tv_nsec) / 1000000000.0;
 }
 
+/* getchar_unlocked usa o buffer interno de stdin, mas evita o custo de scanf
+ * para cada inteiro da matriz. O separador fica pendente para que, ao terminar
+ * a matriz, possamos consumir somente o restante da linha antes de ler a grade. */
+static int pending_input_char;
+static int has_pending_input_char;
+
+static int fast_getchar(void)
+{
+  if (has_pending_input_char)
+  {
+    has_pending_input_char = 0;
+    return pending_input_char;
+  }
+  return getchar_unlocked();
+}
+
+/* Retorna 1 ao ler um int, 0 para entrada malformada/EOF e -1 em overflow. */
+static int fast_read_int(int *value)
+{
+  int ch;
+  do
+  {
+    ch = fast_getchar();
+  } while (ch != EOF && isspace((unsigned char)ch));
+
+  int negative = 0;
+  if (ch == '+' || ch == '-')
+  {
+    negative = (ch == '-');
+    ch = fast_getchar();
+  }
+  if (ch < '0' || ch > '9')
+    return 0;
+
+  unsigned int limit = negative ? (unsigned int)INT_MAX + 1U : (unsigned int)INT_MAX;
+  unsigned int number = 0;
+  do
+  {
+    unsigned int digit = (unsigned int)(ch - '0');
+    if (number > (limit - digit) / 10U)
+      return -1;
+    number = number * 10U + digit;
+    ch = fast_getchar();
+  } while (ch >= '0' && ch <= '9');
+
+  if (ch != EOF)
+  {
+    if (!isspace((unsigned char)ch))
+      return 0;
+    pending_input_char = ch;
+    has_pending_input_char = 1;
+  }
+
+  if (negative)
+    *value = (number == (unsigned int)INT_MAX + 1U) ? INT_MIN : -(int)number;
+  else
+    *value = (int)number;
+  return 1;
+}
+
 int read_input_profiled(SimulationConfig *config, InputTiming *timing)
 {
   struct timespec total_start, total_end, allocation_start, allocation_end;
   double allocation_seconds = 0.0;
   clock_gettime(CLOCK_MONOTONIC, &total_start);
   char *line = NULL;
+  has_pending_input_char = 0;
   *config = (SimulationConfig){0};
 
   if (scanf("%d %d %d", &config->L, &config->C, &config->G) != 3)
@@ -73,7 +135,7 @@ int read_input_profiled(SimulationConfig *config, InputTiming *timing)
 
   for (size_t pos = 0; pos < total_cells; pos++)
   {
-    if (scanf("%d", &config->rule_matrix[pos]) != 1)
+    if (fast_read_int(&config->rule_matrix[pos]) != 1)
     {
       fprintf(stderr, "Erro ao ler matriz de regras.\n");
       goto fail;
@@ -87,7 +149,7 @@ int read_input_profiled(SimulationConfig *config, InputTiming *timing)
   }
 
   int ch;
-  while ((ch = getchar()) != '\n' && ch != EOF)
+  while ((ch = fast_getchar()) != '\n' && ch != EOF)
   {
   }
 

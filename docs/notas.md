@@ -118,10 +118,8 @@ do calculo e das barreiras. Os tempos por fase sao medianas independentes, logo
 nao se deve esperar que a soma delas seja exatamente a mediana de `total_s`.
 
 A comparacao com `life.c` foi feita na secao seguinte. A varredura mostra que
-priorizar somente mais threads nao resolve o limite observado no tempo total.
-Com a linha de base registrada, a proxima otimizacao a investigar e a leitura
-sequencial da matriz de regras (atualmente feita com milhoes de chamadas a
-`scanf`); a impressao pode ser investigada separadamente.
+priorizar somente mais threads nao resolve o limite observado no tempo total;
+a leitura sequencial da matriz foi otimizada posteriormente nesta nota.
 
 ## Speedup contra life.c nos mesmos inputs
 
@@ -149,9 +147,85 @@ Portanto, a escolha otima depende do tamanho da grade e de G. O valor 10,80x e
 valido para estes inputs sinteticos com uma regra B3/S23 e nao garante o mesmo
 resultado em instancias com outra distribuicao de regras ou dimensoes.
 
-Com esta comparacao, a etapa de speedup contra a referencia sequencial esta
-concluida. A proxima otimizacao a investigar e a leitura da matriz de regras,
-mantendo estes mesmos inputs e repeticoes para comparar o efeito sem misturar
-mudancas no kernel paralelo.
+Esta foi a linha de base de speedup antes da otimizacao da leitura. A secao
+posterior registra a nova medicao contra `life.c` com os mesmos inputs.
+
+## Otimizacao da leitura da matriz de regras
+
+`src/io.c` agora usa `fast_read_int` com `getchar_unlocked` para os `L*C`
+identificadores da matriz, evitando o custo de formatacao/conversao de uma
+chamada `scanf` por inteiro. A conversao verifica sinal, overflow de `int` e
+separadores em branco; a validacao do intervalo `[0, R)` continua no chamador.
+O restante do formato de entrada, inclusive as linhas da grade que contêm
+espacos significativos, permanece igual. O tempo dessa mudanca deve aparecer
+principalmente em `input_s`; alocacao e evolucao nao foram alteradas.
+
+### Resultados antes/depois
+
+Os CSVs gerados no SDumont mostram, com uma thread, a seguinte mudança na fase
+de entrada:
+
+| grade | G | input antes | input depois | reducao |
+|---|---:|---:|---:|---:|
+| 500x500 | 10 | 0,01600 s | 0,00384 s | 76,0% (4,17x) |
+| 500x500 | 100 | 0,01616 s | 0,00373 s | 76,9% (4,33x) |
+| 1000x1000 | 10 | 0,05988 s | 0,01411 s | 76,4% (4,24x) |
+| 1000x1000 | 100 | 0,06022 s | 0,01415 s | 76,5% (4,26x) |
+| 2000x2000 | 10 | 0,23624 s | 0,05505 s | 76,7% (4,29x) |
+| 2000x2000 | 100 | 0,23557 s | 0,05307 s | 77,5% (4,44x) |
+
+Em cada caso, a melhor configuracao total observada tambem melhorou:
+
+| grade | G | threads antes -> depois | total antes | total depois | reducao observada |
+|---|---:|---:|---:|---:|---:|
+| 500x500 | 10 | 16 -> 8 | 0,02263 s | 0,01049 s | 53,7% |
+| 500x500 | 100 | 24 -> 16 | 0,03038 s | 0,01815 s | 40,2% |
+| 1000x1000 | 10 | 16 -> 16 | 0,07993 s | 0,03463 s | 56,7% |
+| 1000x1000 | 100 | 24 -> 24 | 0,10226 s | 0,05417 s | 47,0% |
+| 2000x2000 | 10 | 24 -> 24 | 0,31032 s | 0,12858 s | 58,6% |
+| 2000x2000 | 100 | 48 -> 48 | 0,36269 s | 0,18461 s | 49,1% |
+
+A evidência mais direta da otimizacao e a fase de entrada: caiu em media 76,7%
+(aproximadamente 4,3x) com uma thread. Os totais sao reducoes observadas entre
+dois jobs distintos e nao devem ser atribuidos integralmente ao parser: algumas
+medianas de evolucao tambem variaram entre as rodadas, e os jobs podem ter
+executado em nos diferentes. No caso 2000x2000/G=100/48 threads, por exemplo,
+entrada caiu de 0,23717 s para 0,05307 s, enquanto evolucao foi de 0,06096 s
+para 0,06349 s e impressao de 0,06404 s para 0,06455 s. Isso sustenta que a
+queda do total nessa configuracao veio principalmente da leitura. Depois da
+otimizacao, entrada, evolucao e impressao passaram a ter custos de ordem
+semelhante; o proximo alvo promissor e a impressao, seguida de novas medicoes
+com o protocolo controlado.
+
+### Speedup contra `life.c` depois da otimizacao
+
+Nova execucao de `compare_speedup_sdumont.sbatch`, com cinco repeticoes, os
+mesmos seis inputs e `parallel_static_after_io`. A tabela compara o melhor
+speedup de cada caso antes/depois; os valores anteriores sao da secao
+"Speedup contra life.c nos mesmos inputs".
+
+| grade | G | melhor threads depois | speedup antes | speedup depois | aumento do speedup |
+|---|---:|---:|---:|---:|---:|
+| 500x500 | 10 | 16 | 2,18x | 4,41x | 102,3% |
+| 500x500 | 100 | 24 | 8,16x | 13,29x | 63,0% |
+| 1000x1000 | 10 | 24 | 2,36x | 5,17x | 119,2% |
+| 1000x1000 | 100 | 24 | 9,76x | 17,16x | 75,8% |
+| 2000x2000 | 10 | 24 | 2,47x | 5,92x | 140,1% |
+| 2000x2000 | 100 | 48 | 10,80x | 21,24x | 96,7% |
+
+O melhor resultado passou de 10,80x para 21,24x: aproximadamente 1,97 vez o
+speedup anterior. Nesse caso (2000x2000, G=100, 48 threads), o tempo paralelo
+caiu de 0,36970 s para 0,18926 s, enquanto a mediana de `life.c` ficou proxima
+(3,99144 s antes; 4,01912 s depois). Isso confirma que a leitura mais rapida
+reduziu o tempo total e elevou o speedup medido contra a referencia. Em todos os
+seis casos o melhor speedup aumentou. Para 1000x1000/G=10, 16 e 24 threads
+ficaram praticamente empatadas (5,17144x e 5,17179x).
+
+As rodadas foram jobs separados, entao pode haver variacao de maquina/carga;
+as medianas de `life.c` variaram menos de 0,7%, e os inputs e repeticoes foram
+mantidos, o que torna a comparacao razoavel, embora nao perfeitamente
+controlada. O resultado maximo registrado para esta versao e 21,24x nos inputs
+sinteticos do benchmark; ele nao garante o mesmo speedup em todas as instancias
+de validacao.
 
 ## Duvidas
