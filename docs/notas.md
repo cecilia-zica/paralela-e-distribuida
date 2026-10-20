@@ -194,10 +194,10 @@ entrada caiu de 0,23717 s para 0,05307 s, enquanto evolucao foi de 0,06096 s
 para 0,06349 s e impressao de 0,06404 s para 0,06455 s. Isso sustenta que a
 queda do total nessa configuracao veio principalmente da leitura. Depois da
 otimizacao, entrada, evolucao e impressao passaram a ter custos de ordem
-semelhante; o proximo alvo promissor e a impressao, seguida de novas medicoes
-com o protocolo controlado.
+semelhante; naquela rodada, a impressao era o proximo alvo promissor. A medicao
+da otimizacao aparece na secao abaixo.
 
-### Speedup contra `life.c` depois da otimizacao
+### Speedup contra `life.c` depois da otimizacao da leitura
 
 Nova execucao de `compare_speedup_sdumont.sbatch`, com cinco repeticoes, os
 mesmos seis inputs e `parallel_static_after_io`. A tabela compara o melhor
@@ -227,5 +227,54 @@ mantidos, o que torna a comparacao razoavel, embora nao perfeitamente
 controlada. O resultado maximo registrado para esta versao e 21,24x nos inputs
 sinteticos do benchmark; ele nao garante o mesmo speedup em todas as instancias
 de validacao.
+
+## Otimizacao da impressao da grade
+
+Em `src/io.c`, `print_grid` deixou de chamar `putchar` para cada celula. Agora
+monta a saida em um buffer de 64 KiB, converte os estados 0/1 por uma tabela de
+caracteres, envia blocos com `fwrite` e descarrega o bloco final com `fflush`.
+`stdout` e configurado como totalmente bufferizado antes da escrita, evitando
+descarregamentos por linha em execucoes interativas. O formato continua com
+exatamente `L` linhas de `C` caracteres, incluindo espacos para celulas mortas.
+O script `check_print_sdumont.sbatch` compara byte a byte a saida antiga e a
+nova nos seis inputs sinteticos.
+
+### Medicao por fase
+
+Nos CSVs do SDumont, `print_s` caiu entre 93,9% e 95,1% para todas as grades,
+geracoes e contagens de threads medidas. Exemplos: em 500x500/G=10/1 thread,
+caiu de 0,003970 s para 0,000232 s; em 2000x2000/G=100/48 threads, de
+0,063215 s para 0,003733 s. A reducao do tempo total depende do peso da
+impressao: ficou pequena nos casos com 100 geracoes e maior nos casos curtos,
+em que a evolucao paralela dura menos.
+
+### Speedup contra `life.c` depois da otimizacao da impressao
+
+Comparacao externa com cinco repeticoes, os mesmos inputs sinteticos e o mesmo
+`life.c`. A tabela apresenta o melhor speedup de cada caso antes/depois da
+otimizacao da impressao:
+
+| grade | G | melhores threads | speedup antes | speedup depois | aumento |
+|---|---:|---:|---:|---:|---:|
+| 500x500 | 10 | 16 | 4,41x | 6,76x | 53,4% |
+| 500x500 | 100 | 24 | 13,29x | 18,56x | 39,6% |
+| 1000x1000 | 10 | 16 | 5,17x | 8,83x | 70,8% |
+| 1000x1000 | 100 | 24 | 17,16x | 25,34x | 47,7% |
+| 2000x2000 | 10 | 24 | 5,92x | 10,68x | 80,5% |
+| 2000x2000 | 100 | 48 | 21,24x | 33,93x | 59,8% |
+
+O maior speedup desta rodada foi 33,93x para 2000x2000, G=100 e 48 threads,
+contra 21,24x antes da otimizacao da impressao. Nessa configuracao, o tempo
+paralelo externo caiu de 0,18926 s para 0,11854 s (37,4%); a mediana de `life.c`
+ficou praticamente igual (4,01912 s e 4,02167 s). Comparando as mesmas
+contagens de threads nas melhores configuracoes anteriores, os tempos
+paralelos externos cairam de 29,3% a 44,4% nos seis casos.
+
+Os tempos de `life.c` entre as rodadas variaram no maximo cerca de 1,8%, mas os
+jobs foram separados e podem ter executado sob cargas diferentes. A reducao
+isolada de `print_s` e consistente; os ganhos de speedup observados tambem
+consideram variacao da execucao completa. O resultado maximo de 33,93x vale para
+os inputs sinteticos usados e nao garante a mesma aceleracao em outras
+instancias ou distribuicoes de regras.
 
 ## Duvidas

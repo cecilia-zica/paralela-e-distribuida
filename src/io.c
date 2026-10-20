@@ -195,10 +195,39 @@ int read_input(SimulationConfig *config)
 
 void print_grid(const unsigned char *grid, int rows, int cols)
 {
+  enum { OUTPUT_BUFFER_SIZE = 64 * 1024 };
+  static const char cell_chars[] = {' ', 'x'};
+  char output[OUTPUT_BUFFER_SIZE];
+  size_t used = 0;
+
+  /* A saída é gerada uma única vez neste programa. Buffer completo evita que
+   * stdout em modo terminal descarregue os dados a cada quebra de linha. */
+  (void)setvbuf(stdout, NULL, _IOFBF, OUTPUT_BUFFER_SIZE);
+
   for (int row = 0; row < rows; row++)
   {
     for (int col = 0; col < cols; col++)
-      putchar(grid[row * cols + col] ? 'x' : ' ');
-    putchar('\n');
+    {
+      size_t pos = (size_t)row * (size_t)cols + (size_t)col;
+      output[used++] = cell_chars[grid[pos] != 0];
+      if (used == sizeof(output))
+      {
+        (void)fwrite(output, 1, used, stdout);
+        used = 0;
+      }
+    }
+
+    output[used++] = '\n';
+    if (used == sizeof(output))
+    {
+      (void)fwrite(output, 1, used, stdout);
+      used = 0;
+    }
   }
+
+  if (used > 0)
+    (void)fwrite(output, 1, used, stdout);
+
+  /* Inclui a descarga final em print_s, facilitando comparar esta fase. */
+  (void)fflush(stdout);
 }

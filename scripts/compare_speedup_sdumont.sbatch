@@ -12,10 +12,12 @@ cd "$SLURM_SUBMIT_DIR"
 
 module load gcc/13.2_sequana
 unset LIFE_TIMING
+parallel_bin="${PARALLEL_BIN:-./parallel_static}"
+speedup_output="${SPEEDUP_OUTPUT:-./bench-results/speedups.csv}"
 
 python3 scripts/compare_life_speedup.py \
   --life ./life \
-  --parallel ./parallel_static \
+  --parallel "$parallel_bin" \
   --inputs ./bench-inputs \
-  --output ./bench-results/speedups.csv \
+  --output "$speedup_output" \
   --repeats 5
