@@ -277,4 +277,55 @@ consideram variacao da execucao completa. O resultado maximo de 33,93x vale para
 os inputs sinteticos usados e nao garante a mesma aceleracao em outras
 instancias ou distribuicoes de regras.
 
+## Otimizacao do kernel de evolucao: tabela de transicoes (apenas teste, alterações não foram commitadas)
+
+Em `src/game_rules.h`, `Rule` ganhou `next_state[2][9]`. `parse_rule` preenche a
+tabela a partir de `birth` e `survival`, e `update_rows` agora seleciona o
+proximo estado por `regra->next_state[me[col] != 0][neighbors]`, removendo o
+`if` por celula entre nascimento e sobrevivencia. O calculo dos vizinhos e a
+particao estatica de linhas foram mantidos nesta rodada.
+Essas mudanças foram apenas testes então não vou dar commit delas por agora. Deixo aqui nas notas para termos registrado
+
+### Medicao por fase
+
+Comparando as medianas antes/depois no SDumont, `evolution_s` diminuiu em 41
+das 42 combinacoes de grade, geracoes e threads. As reducoes variaram de 8,6% a
+41,8%. A excecao foi 2000x2000/G=100/48 threads, com aumento de 12,6%
+(0,058768 s para 0,066159 s). O tempo total diminuiu em 37 combinacoes; as
+cinco restantes tiveram pequenas ou moderadas pioras, com a maior tambem em
+2000x2000/G=100/48 threads: 7,2% (0,121634 s para 0,130352 s).
+
+Exemplos de reducao de `evolution_s`:
+
+| grade | G | threads | antes | depois | reducao |
+|---|---:|---:|---:|---:|---:|
+| 1000x1000 | 100 | 24 | 0,023193 s | 0,018823 s | 18,8% |
+| 2000x2000 | 10 | 24 | 0,012090 s | 0,007808 s | 35,4% |
+| 2000x2000 | 100 | 24 | 0,083941 s | 0,062144 s | 26,0% |
+
+### Speedup contra `life.c`
+
+O speedup maximo passou de 33,93x para 35,54x em 2000x2000/G=100/48 threads,
+um aumento de 4,8%. A tabela compara o melhor speedup de cada caso antes e
+depois da tabela de transicoes:
+
+| grade | G | melhores threads depois | speedup antes | speedup depois | variacao |
+|---|---:|---:|---:|---:|---:|
+| 500x500 | 10 | 16 | 6,76x | 6,86x | +1,4% |
+| 500x500 | 100 | 48 | 18,56x | 17,20x | -7,3% |
+| 1000x1000 | 10 | 16 | 8,83x | 9,06x | +2,6% |
+| 1000x1000 | 100 | 24 | 25,34x | 27,46x | +8,4% |
+| 2000x2000 | 10 | 24 | 10,68x | 10,73x | +0,4% |
+| 2000x2000 | 100 | 48 | 33,93x | 35,54x | +4,8% |
+
+O melhor speedup aumentou em cinco dos seis cenarios; 500x500/G=100 regrediu
+7,3%. Para 2000x2000/G=100/48 threads, o tempo paralelo externo caiu de
+0,118536 s para 0,113495 s, enquanto `life.c` ficou praticamente estavel
+(4,021669 s para 4,034026 s). As duas medicões por fase e externas discordam
+em algumas configuracoes — por exemplo, 2000x2000/G=100/48 threads — e os jobs
+foram executados separadamente. Portanto, o ganho maximo e promissor, mas a
+regressao em 500x500/G=100 e as diferencas devem ser confirmadas repetindo
+binarios antigo e novo intercalados no mesmo job/alocacao. O maior valor medido
+ate aqui e 35,54x nos inputs sinteticos.
+
 ## Duvidas
