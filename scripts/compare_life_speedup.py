@@ -5,6 +5,7 @@ import argparse
 import csv
 import os
 import random
+import shlex
 import statistics
 import subprocess
 import time
@@ -44,6 +45,7 @@ def main():
 
     env = os.environ.copy()
     env.pop("LIFE_TIMING", None)
+    parallel_extra_args = shlex.split(env.get("PARALLEL_EXTRA_ARGS", ""))
     rng = random.Random(args.seed)
     records = []
 
@@ -53,7 +55,7 @@ def main():
 
         life_command = [str(args.life.resolve())]
         parallel_commands = {
-            threads: [str(args.parallel.resolve()), str(threads)]
+            threads: [str(args.parallel.resolve()), str(threads), *parallel_extra_args]
             for threads in THREAD_COUNTS
         }
 

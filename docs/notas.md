@@ -328,4 +328,46 @@ regressao em 500x500/G=100 e as diferencas devem ser confirmadas repetindo
 binarios antigo e novo intercalados no mesmo job/alocacao. O maior valor medido
 ate aqui e 35,54x nos inputs sinteticos.
 
+## Comparacao entre particionamento estatico e dinamico
+
+Foi implementada uma versao Pthreads dinamica em `src/parallel_dynamic.c` para
+comparacao com `parallel_static`. A versao dinamica distribui blocos de linhas
+por meio de um contador atomico compartilhado. O tamanho do bloco e configuravel;
+o benchmark no SDumont varreu blocos de 1, 2, 4, 8, 16 e 32 linhas, com 1, 2,
+4, 8, 16, 24 e 48 threads, em grades de 500x500, 1000x1000 e 2000x2000, todas
+com G=100. Cada configuracao teve cinco repeticoes.
+
+Na comparacao de tempo total entre os executaveis, usando o mesmo numero de
+threads e bloco dinamico de 4 linhas, a dinamica foi mais rapida em 10 das 42
+configuracoes e a estatica em 32. Variacoes muito pequenas, abaixo de 1%, nao
+devem ser consideradas conclusivas, pois os programas foram medidos em jobs
+separados.
+
+Alguns resultados representativos da dinamica:
+
+| grade | G | threads | tempo estatico | tempo dinamico | diferenca do dinamico |
+|---|---:|---:|---:|---:|---:|
+| 1000x1000 | 100 | 4 | 0,135267 s | 0,125890 s | 6,9% mais rapido |
+| 2000x2000 | 100 | 4 | 0,487238 s | 0,464880 s | 4,6% mais rapido |
+| 2000x2000 | 100 | 8 | 0,283949 s | 0,275482 s | 3,0% mais rapido |
+| 2000x2000 | 100 | 24 | 0,148690 s | 0,143660 s | 3,4% mais rapido |
+| 2000x2000 | 100 | 48 | 0,123144 s | 0,120724 s | 2,0% mais rapido |
+| 500x500 | 100 | 24 | 0,014638 s | 0,016807 s | 14,8% mais lento |
+| 500x500 | 100 | 8 | 0,020264 s | 0,022644 s | 11,7% mais lento |
+
+O melhor speedup da tabela comparativa foi 33,13x para a dinamica em
+2000x2000/G=100/48 threads, contra 32,45x para a estatica na mesma configuracao.
+Esse ganho de aproximadamente 2% e modesto. A estatica teve melhores tempos na
+maioria dos pares medidos, inclusive em todas as configuracoes de 2000x2000/G=10.
+
+A varredura de granularidade tambem nao apontou um tamanho de bloco que seja
+melhor em todos os casos. Blocos pequenos aumentam a frequencia de operacoes no
+contador atomico; blocos grandes reduzem a flexibilidade do balanceamento. Como
+o custo por celula e relativamente uniforme, a fila dinamica frequentemente
+adiciona coordenacao sem compensacao suficiente. Com estes resultados, a
+particao estatica deve continuar como implementacao padrao; a dinamica fica como
+alternativa comparativa. Os resultados sao dos inputs sinteticos usados e devem
+ser descritos como observacoes experimentais, nao como garantia para qualquer
+instancia.
+
 ## Duvidas
