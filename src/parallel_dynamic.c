@@ -68,7 +68,7 @@ int main(int argc, char **argv)
     fprintf(stderr, "Uso: %s <threads> [linhas_por_bloco] < entrada.in\n", argv[0]);
     return 1;
   }
-  int nthreads, chunk = 4;
+  int nthreads, chunk = 0;   // 0 = calcular o bloco a partir de L e das threads
   if (!parse_positive(argv[1], &nthreads) ||
       (argc == 3 && !parse_positive(argv[2], &chunk))) {
     fprintf(stderr, "Threads e linhas_por_bloco devem ser inteiros positivos.\n");
@@ -78,6 +78,10 @@ int main(int argc, char **argv)
   SimulationConfig config = {0};
   if (read_input(&config)) return 1;
   if (nthreads > config.L) nthreads = config.L;
+  if (chunk == 0) {
+    chunk = config.L / (nthreads * 4); 
+    if (chunk < 1) chunk = 1;
+  }
 
   size_t cells = (size_t)config.L * (size_t)config.C;
   unsigned char *buffer = malloc(cells);

@@ -4,3 +4,4 @@
 build/*
 !build/.gitkeep
 /parallel_static
+/parallel_dynamic
